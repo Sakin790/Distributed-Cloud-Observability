@@ -1,60 +1,54 @@
-# Distributed Cloud Observability Pipeline
+# AWS Centralized Monitoring Project
 
-A highly scalable, infrastructure-as-code (IaC) driven distributed observability pipeline. This project provisions multi-node Linux infrastructure using Terraform and establishes an automated telemetry collection system utilizing OpenTelemetry (OTel), Prometheus (TSDB), and Grafana.
+## What this project does
+This project automatically sets up a centralized monitoring and logging system in AWS using Terraform. It provisions 6 EC2 instances:
+* **Server 6 (Parent Node):** Acts as the central monitoring server running OpenTelemetry Collector, Prometheus, and Grafana.
+* **Servers 1-5 (Child Nodes):** Act as application servers running OpenTelemetry Collector, which automatically collects logs and metrics and pushes them to Server 6.
 
-The architecture captures distributed system metrics (CPU, Memory, Network, Disk) without manual intervention, delivering a dynamic, production-ready monitoring experience.
+---
+
+## How it works
+1. **Networking:** Terraform creates a secure VPC and Subnet. It opens specific ports (22, 3000, 9090) on Server 6 only for your IP address. Internal ports (4317, 4318) are kept open strictly within the VPC network for data transfer between servers.
+2. **Provisioning:** Server 6 is created first and runs a setup script (`server_6_monitoring.sh`) to install the monitoring tools.
+3. **Dynamic Configuration:** Servers 1-5 are created next. Terraform automatically detects Server 6's private IP and injects it into a template (`otel-config.yaml.tftpl`), configuring the child nodes to send data directly to the correct parent server.
+
+---
+
+## How to use it
+
+### Prerequisites
+* Ensure Terraform and AWS CLI are installed on your machine.
+* Configure your AWS credentials (`aws configure`).
+
+### Steps to Run
+1. Initialize the Terraform project:
+   ```bash
+   terraform init
 
 
-## 🚀 Key Features
+Review the infrastructure plan:
+    Bash
 
-    Infrastructure as Code: 100% automated multi-node Linux instance provisioning using Terraform.
+    terraform plan
 
-    Zero-Touch Telemetry (GitOps/Cloud-init): OTel Agents automatically deploy and register as systemd daemons upon instance launch.
+    Create the AWS resources:
+    Bash
 
-    Centralized Telemetry Gateway: A dedicated OpenTelemetry Collector Gateway that ingests, processes (batching/filtering), and exports metrics.
+    terraform apply
 
-    Dynamic Target Discovery: Real-time host discovery on Grafana dashboards as infrastructure scales up or down via Terraform.
+    (Type yes when prompted and wait a few minutes for the setup to complete).
 
-    Proactive Alerting: Configured automated alert thresholds for infrastructure anomalies (e.g., CPU spikes, memory exhaustion) routed to modern alerting channels.
+Accessing Dashboards
 
-## 🏗️ System Architecture
-Plaintext
+After the deployment finishes, use the outputs to get Server 6's public IP:
 
-[ Linux Host 01 ] ──(OTel Agent)──┐
-[ Linux Host 02 ] ──(OTel Agent)──┼──► [ OTel Central Gateway ] ──► [ Prometheus (TSDB) ] ──► [ Grafana Dashboard ]
-[ Linux Host 03 ] ──(OTel Agent)──┘
+    Grafana Dashboard: http://<Server-6-Public-IP>:3000 (Default login: admin / admin)
 
-    Collection Layer: Light-weight otel-collector daemons scrape native host metrics via the hostmetrics receiver.
+    Prometheus UI: http://<Server-6-Public-IP>:9090
 
-    Gateway Layer: The Central OTel Gateway receives distributed telemetry data via high-performance OTLP (gRPC/HTTP), batches the data to optimize memory, and transforms it.
+Cleanup (To avoid AWS charges)
 
-    Storage Layer (TSDB): Prometheus scrapes or receives metrics from the gateway, storing time-series data locally with custom retention profiles.
+When you are done testing, destroy all created resources:
+Bash
 
-    Visualization Layer: Grafana queries Prometheus to map real-time performance analytics on dynamic dashboards.
-
-## 🛠️ Tech Stack & Tools
-
-    Infrastructure: Terraform (AWS / Local Providers like Multipass or Docker)
-
-    OS Target: Linux (Ubuntu / Debian / Arch-based hosts)
-
-    Instrumentation: OpenTelemetry (OTel Collector & Agents)
-
-    Storage Engine: Prometheus (Time-Series Database)
-
-    Visualization: Grafana (Data-driven Dashboards)
-
-## 📂 Repository Structure
-Plaintext
-
-├── terraform/
-│   ├── main.tf            # Core infrastructure logic
-│   ├── variables.tf       # Configurable scaling variables (e.g., node count)
-│   └── outputs.tf         # Dynamic IP and endpoint tracking
-├── telemetry/
-│   ├── agent-config.yaml  # OTel Agent configurations for remote nodes
-│   └── gateway-config.yaml# Central OTel Collector pipeline logic
-├── monitoring/
-│   ├── prometheus.yml     # TSDB scrape intervals and storage profiles
-│   └── grafana-dashboard.json # Pre-configured JSON dashboard for host metrics
-└── README.md
+terraform destroy
