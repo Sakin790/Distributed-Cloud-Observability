@@ -1,0 +1,30 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  
+  # চাইলে সার্ভার ১-৫ এর নিজস্ব হোস্ট মেট্রিক ও লগ নেওয়ার জন্য hostmetrics/file রিসিভার যোগ করতে পারেন, 
+  # তবে আপাতত বেসিক OTLP রিসিভার দিয়েই চাইল্ড টু প্যারেন্ট ডেটা ফ্লো টেস্ট করা ভালো।
+
+processors:
+  batch:
+
+exporters:
+  otlp/parent:
+    endpoint: "${monitoring_private_ip}:4317" # ৬ নম্বর সার্ভারের প্রাইভেট আইপি এখানে ডায়নামিকালি বসবে
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/parent]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/parent]
